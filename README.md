@@ -1,4 +1,4 @@
-### *spring框架*
+### *spring框架demo*
 ---
 #### 框架在初始化的时候都要做那些事情
 1. 加载配置文件（init类的doLoadConfig）
