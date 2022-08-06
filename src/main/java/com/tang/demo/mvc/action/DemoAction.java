@@ -17,14 +17,14 @@ import java.io.IOException;
 public class DemoAction {
 
     @Autowired
-    IDemoService demoService;
+    private IDemoService demoService;
 
     @RequestMapping("/query")
     public void query(HttpServletRequest req, HttpServletResponse resp,
-                      @RequestParam("name") String name) {
-        String s = demoService.get(name);
+                      @RequestParam("name") String name){
+        String result = demoService.get(name);
         try {
-            resp.getWriter().write(s);
+            resp.getWriter().write(result);
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -32,18 +32,17 @@ public class DemoAction {
 
     @RequestMapping("/add")
     public void add(HttpServletRequest req, HttpServletResponse resp,
-                    @RequestParam("a") Integer a,@RequestParam("b") Integer b){
+                    @RequestParam("a") Integer a, @RequestParam("b") Integer b){
         try {
-            resp.getWriter().write(a+"+"+b+"="+(a+b));
+            resp.getWriter().write(a + "+" + b + "=" + (a + b));
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
     @RequestMapping("/remove")
-    public String remove(@RequestParam("id") Integer id){
-        return ""+id;
+    public String  remove(@RequestParam("id") Integer id){
+        return "" + id;
     }
-
 
 }

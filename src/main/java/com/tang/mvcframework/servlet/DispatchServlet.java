@@ -1,18 +1,18 @@
 package com.tang.mvcframework.servlet;
 
-import com.sun.xml.internal.bind.v2.model.core.ID;
-import com.tang.mvcframework.annotation.Autowired;
-import com.tang.mvcframework.annotation.Controller;
-import com.tang.mvcframework.annotation.RequestMapping;
-import com.tang.mvcframework.annotation.Service;
+import com.tang.mvcframework.annotation.*;
 
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.URL;
 import java.util.*;
@@ -29,7 +29,7 @@ import java.util.*;
  * 5.Spring 和核心功能已经完成 IOC、DI
  * 6.构造HandlerMapping，将URL和Method进行关联（init类的HandlerMapping方法）
  **/
-public class DisparchSecvlrt extends HttpServlet {
+public class DispatchServlet extends HttpServlet {
 
     /**
      * 此变量用来保存application.properties配置文件中的内容
@@ -76,7 +76,8 @@ public class DisparchSecvlrt extends HttpServlet {
      * @param contextConfigLocation 读取xml文件中初始化的配置的文件名
      */
     private void doLoadConfig(String contextConfigLocation) {
-        InputStream is = this.getClass().getClassLoader().getResourceAsStream(contextConfigLocation);
+//        InputStream is = this.getClass().getClassLoader().getResourceAsStream(contextConfigLocation);
+        InputStream is = this.getClass().getClassLoader().getResourceAsStream("application.properties");
         try {
             contextConfig.load(is);
         } catch (IOException e) {
@@ -244,6 +245,72 @@ public class DisparchSecvlrt extends HttpServlet {
                 System.out.println("Mapped: " + url + "," + method);
             }
         }
+    }
+
+    /**
+     * 容器初始化部分完成后，进入运行时处理逻辑部分，即
+     */
+    @Override
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        this.doPost(req, resp);
+    }
+
+    @Override
+    protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        try {
+            doDispatch(req, resp);
+        } catch (InvocationTargetException e) {
+            e.printStackTrace();
+        } catch (IllegalAccessException e) {
+            e.printStackTrace();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void doDispatch(HttpServletRequest req, HttpServletResponse resp) throws InvocationTargetException, IllegalAccessException {
+        //拿到除去host（域名或者ip）部分的路径
+        String url = req.getRequestURI();
+        //拿到上面路径的根路径
+        String contextPath = req.getContextPath();
+        url = url.replaceAll(contextPath, "").replaceAll("/+", "/");
+        //找到该url对应的方法
+        Method method = this.handlerMapping.get(url);
+        //保存请求的url参数列表
+        Map<String, String[]> params = req.getParameterMap();
+        //获取方法的形参列表
+        Class<?>[] parameterTypes = method.getParameterTypes();
+        //保存赋值参数的位置
+        Object[] paramValues = new Object[parameterTypes.length];
+        //根据参数位置动态赋值
+        for (int i = 0; i < parameterTypes.length; i++) {
+            Class<?> parameterType = parameterTypes[i];
+            if (parameterType == HttpServletRequest.class){
+                paramValues[i] = req;
+            } else if(parameterType == HttpServletResponse.class){
+                paramValues[i] = resp;
+            } else if(parameterType == String.class) {
+                //如果请求或者响应类型中没有方法参数的值的类型，就通过param注解在运行时去获取
+                //Annotation[][]:返回该方法参数的所有注解（返回第几个参数的第几个注解）
+                Annotation[][] pa = method.getParameterAnnotations();
+                for (int j = 0; j < pa.length; j++) {
+                    for(Annotation a : pa[j]){
+                        if (a instanceof RequestParam){
+                            // 拿到RequestParam注解的值
+                            String paramName = ((RequestParam) a).value();
+                            if (!"".equals(paramName.trim())){
+                                String value = Arrays.toString(params.get(paramName))
+                                        .replaceAll("\\[|\\]", "")
+                                        .replaceAll("\\s+", ",");
+                                paramValues[i] = value;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        String beanName = toLowerFirstCase(method.getDeclaringClass().getSimpleName());
+        method.invoke(ioc.get(beanName),paramValues);
     }
 
 }
